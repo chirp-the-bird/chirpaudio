@@ -1,0 +1,122 @@
+{
+  "meters": {
+    "rms": {
+      "id": "rmsGrad",
+      "orientation": "horizontal",
+      "range": {
+        "min": -50,
+        "max": 0,
+        "unit": "dB"
+      },
+      "stops": [
+        {
+          "offsetPct": 0,
+          "value": -50.0,
+          "color": "#0A1A3A"
+        },
+        {
+          "offsetPct": 48,
+          "value": -26.0,
+          "color": "#1E6A5A"
+        },
+        {
+          "offsetPct": 72,
+          "value": -14.0,
+          "color": "#3CC76A"
+        },
+        {
+          "offsetPct": 90,
+          "value": -5.0,
+          "color": "#00B6AE"
+        },
+        {
+          "offsetPct": 100,
+          "value": 0.0,
+          "color": "#FFFFFF"
+        }
+      ]
+    },
+    "lufs": {
+      "id": "lufsGrad",
+      "orientation": "horizontal",
+      "range": {
+        "min": -40,
+        "max": 10,
+        "unit": "LUFS"
+      },
+      "stops": [
+        {
+          "offsetPct": 0,
+          "value": -40.0,
+          "color": "#0A1A3A"
+        },
+        {
+          "offsetPct": 22,
+          "value": -29.0,
+          "color": "#1E6A5A"
+        },
+        {
+          "offsetPct": 38,
+          "value": -21.0,
+          "color": "#3CC76A"
+        },
+        {
+          "offsetPct": 70,
+          "value": -5.0,
+          "color": "#00B6AE"
+        },
+        {
+          "offsetPct": 78,
+          "value": -1.0,
+          "color": "#FFFFFF"
+        },
+        {
+          "offsetPct": 100,
+          "value": 10.0,
+          "color": "#FFFFFF"
+        }
+      ]
+    },
+    "lra": {
+      "id": "lraGrad",
+      "orientation": "vertical-bottom-to-top",
+      "range": {
+        "min": 0,
+        "max": 30,
+        "unit": "LU"
+      },
+      "stops": [
+        {
+          "offsetPct": 0,
+          "value": 0.0,
+          "color": "#0A1A3A"
+        },
+        {
+          "offsetPct": 18,
+          "value": 5.4,
+          "color": "#1E6A5A"
+        },
+        {
+          "offsetPct": 38,
+          "value": 11.4,
+          "color": "#3CC76A"
+        },
+        {
+          "offsetPct": 88,
+          "value": 26.4,
+          "color": "#00B6AE"
+        },
+        {
+          "offsetPct": 98,
+          "value": 29.4,
+          "color": "#9FF3EF"
+        },
+        {
+          "offsetPct": 100,
+          "value": 30.0,
+          "color": "#FFFFFF"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "_instructions": "Copy this file to twitch_tokens.json and fill in real values.",
+  "apps": {
+    "chirpaudio": {
+      "client_id": "YOUR_TWITCH_CLIENT_ID",
+      "client_secret": "YOUR_TWITCH_CLIENT_SECRET",
+      "tokens": {
+        "audiotest": {
+          "access_token": "YOUR_TWITCH_OAUTH_ACCESS_TOKEN"
+        }
+      }
+    }
+  }
+}

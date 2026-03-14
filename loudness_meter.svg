@@ -1,0 +1,232 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1700" height="1420" viewBox="0 0 1700 1420" role="img" aria-label="Professional software-style loudness meter design with RMS, LUFS, LRA, clip LED assets, and separate value bar assets">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#131a24"/>
+      <stop offset="100%" stop-color="#0b1118"/>
+    </linearGradient>
+
+    <linearGradient id="panelGloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.07"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="rmsGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0A1A3A"/>
+      <stop offset="48%" stop-color="#1E6A5A"/>
+      <stop offset="72%" stop-color="#3CC76A"/>
+      <stop offset="90%" stop-color="#00b6ae"/>
+      <stop offset="100%" stop-color="#FFFFFF"/>
+    </linearGradient>
+
+    <linearGradient id="lufsGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0A1A3A"/>
+      <stop offset="22%" stop-color="#1E6A5A"/>
+      <stop offset="38%" stop-color="#3CC76A"/>
+      <stop offset="70%" stop-color="#00b6ae"/>
+      <stop offset="78%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#FFFFFF"/>
+    </linearGradient>
+
+    <linearGradient id="lraGrad" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#0A1A3A"/>
+      <stop offset="18%" stop-color="#1E6A5A"/>
+      <stop offset="38%" stop-color="#3CC76A"/>
+      <stop offset="88%" stop-color="#00b6ae"/>
+      <stop offset="98%" stop-color="#9ff3ef"/>
+      <stop offset="100%" stop-color="#FFFFFF"/>
+    </linearGradient>
+
+    <linearGradient id="barGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f9fdff" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#d6e9ff" stop-opacity="0.9"/>
+    </linearGradient>
+
+    <linearGradient id="barGradV" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#f9fdff" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#d6e9ff" stop-opacity="0.9"/>
+    </linearGradient>
+
+    <linearGradient id="ledOff" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5b1717"/>
+      <stop offset="100%" stop-color="#2a0a0a"/>
+    </linearGradient>
+
+    <radialGradient id="ledOn" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#ffd0d0"/>
+      <stop offset="30%" stop-color="#ff7676"/>
+      <stop offset="72%" stop-color="#ff2d2d"/>
+      <stop offset="100%" stop-color="#8c0000"/>
+    </radialGradient>
+
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000" flood-opacity="0.34"/>
+    </filter>
+
+    <filter id="innerShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feOffset dx="0" dy="1"/>
+      <feGaussianBlur stdDeviation="2" result="offset-blur"/>
+      <feComposite operator="out" in="SourceGraphic" in2="offset-blur" result="inverse"/>
+      <feFlood flood-color="#000" flood-opacity="0.42" result="color"/>
+      <feComposite operator="in" in="color" in2="inverse" result="shadow"/>
+      <feComposite operator="over" in="shadow" in2="SourceGraphic"/>
+    </filter>
+
+    <filter id="ledGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#ff3c3c" flood-opacity="0.65"/>
+    </filter>
+  </defs>
+
+  <rect x="0" y="0" width="1700" height="1420" fill="url(#bgGrad)"/>
+
+  <text x="76" y="82" fill="#eaf3ff" font-size="38" font-weight="700" font-family="Segoe UI, Roboto, Arial, sans-serif">Loudness Meter Design — Alternate Gradient</text>
+  <text x="76" y="118" fill="#9db2cc" font-size="20" font-family="Segoe UI, Roboto, Arial, sans-serif">Darker cyan, denser scale markings, standalone bar assets, and clip LED states</text>
+
+  <g filter="url(#softShadow)">
+    <rect x="54" y="146" width="1592" height="1220" rx="26" fill="#1a2431" stroke="#2d3c4f" stroke-width="2"/>
+    <rect x="54" y="146" width="1592" height="170" rx="26" fill="url(#panelGloss)"/>
+  </g>
+
+  <!-- RMS -->
+  <g>
+    <text x="114" y="238" fill="#eef5ff" font-size="28" font-weight="700" font-family="Segoe UI, Roboto, Arial, sans-serif">RMS Loudness</text>
+    <text x="114" y="270" fill="#8ea5bf" font-size="17" font-family="Segoe UI, Roboto, Arial, sans-serif">Static software-style reference meter for RMS average, peak, and dynamic range overlays</text>
+
+    <text x="114" y="320" fill="#d5e2f1" font-size="26" font-family="Segoe UI, Roboto, Arial, sans-serif">-50 dB</text>
+    <text x="978" y="320" fill="#d5e2f1" font-size="26" text-anchor="end" font-family="Segoe UI, Roboto, Arial, sans-serif">0 dB</text>
+
+    <rect x="114" y="340" width="864" height="110" rx="14" fill="#0f1822" stroke="#3a5069" stroke-width="2"/>
+    <rect x="128" y="354" width="836" height="82" rx="10" fill="url(#rmsGrad)" filter="url(#innerShadow)"/>
+
+    <!-- delineators every 5 dB -->
+    <g stroke="#c9d4df" stroke-opacity="0.38" stroke-width="1.2">
+      <line x1="128" y1="354" x2="128" y2="436"/>
+      <line x1="211.6" y1="354" x2="211.6" y2="436"/>
+      <line x1="295.2" y1="354" x2="295.2" y2="436"/>
+      <line x1="378.8" y1="354" x2="378.8" y2="436"/>
+      <line x1="462.4" y1="354" x2="462.4" y2="436"/>
+      <line x1="546" y1="354" x2="546" y2="436"/>
+      <line x1="629.6" y1="354" x2="629.6" y2="436"/>
+      <line x1="713.2" y1="354" x2="713.2" y2="436"/>
+      <line x1="796.8" y1="354" x2="796.8" y2="436"/>
+      <line x1="880.4" y1="354" x2="880.4" y2="436"/>
+      <line x1="964" y1="354" x2="964" y2="436"/>
+    </g>
+
+    <g fill="#c7d4e2" font-size="24" font-family="Segoe UI, Roboto, Arial, sans-serif">
+      <text x="128" y="484" text-anchor="middle">-50</text>
+      <text x="211.6" y="484" text-anchor="middle">-45</text>
+      <text x="295.2" y="484" text-anchor="middle">-40</text>
+      <text x="378.8" y="484" text-anchor="middle">-35</text>
+      <text x="462.4" y="484" text-anchor="middle">-30</text>
+      <text x="546" y="484" text-anchor="middle">-25</text>
+      <text x="629.6" y="484" text-anchor="middle">-20</text>
+      <text x="713.2" y="484" text-anchor="middle">-15</text>
+      <text x="796.8" y="484" text-anchor="middle">-10</text>
+      <text x="880.4" y="484" text-anchor="middle">-5</text>
+      <text x="964" y="484" text-anchor="middle">0</text>
+    </g>
+  </g>
+
+  <!-- LUFS -->
+  <g>
+    <text x="114" y="578" fill="#eef5ff" font-size="28" font-weight="700" font-family="Segoe UI, Roboto, Arial, sans-serif">LUFS Loudness</text>
+    <text x="114" y="610" fill="#8ea5bf" font-size="17" font-family="Segoe UI, Roboto, Arial, sans-serif">Integrated loudness reference meter for LUFS and true-peak overlays</text>
+
+    <text x="114" y="660" fill="#d5e2f1" font-size="26" font-family="Segoe UI, Roboto, Arial, sans-serif">-40 LUFS</text>
+    <text x="978" y="660" fill="#d5e2f1" font-size="26" text-anchor="end" font-family="Segoe UI, Roboto, Arial, sans-serif">10 LUFS</text>
+
+    <rect x="114" y="680" width="864" height="110" rx="14" fill="#0f1822" stroke="#3a5069" stroke-width="2"/>
+    <rect x="128" y="694" width="836" height="82" rx="10" fill="url(#lufsGrad)" filter="url(#innerShadow)"/>
+
+    <!-- delineators every 5 LUFS -->
+    <g stroke="#c9d4df" stroke-opacity="0.38" stroke-width="1.2">
+      <line x1="128" y1="694" x2="128" y2="776"/>
+      <line x1="211.6" y1="694" x2="211.6" y2="776"/>
+      <line x1="295.2" y1="694" x2="295.2" y2="776"/>
+      <line x1="378.8" y1="694" x2="378.8" y2="776"/>
+      <line x1="462.4" y1="694" x2="462.4" y2="776"/>
+      <line x1="546" y1="694" x2="546" y2="776"/>
+      <line x1="629.6" y1="694" x2="629.6" y2="776"/>
+      <line x1="713.2" y1="694" x2="713.2" y2="776"/>
+      <line x1="796.8" y1="694" x2="796.8" y2="776"/>
+      <line x1="880.4" y1="694" x2="880.4" y2="776"/>
+      <line x1="964" y1="694" x2="964" y2="776"/>
+    </g>
+
+    <g fill="#c7d4e2" font-size="24" font-family="Segoe UI, Roboto, Arial, sans-serif">
+      <text x="128" y="824" text-anchor="middle">-40</text>
+      <text x="211.6" y="824" text-anchor="middle">-35</text>
+      <text x="295.2" y="824" text-anchor="middle">-30</text>
+      <text x="378.8" y="824" text-anchor="middle">-25</text>
+      <text x="462.4" y="824" text-anchor="middle">-20</text>
+      <text x="546" y="824" text-anchor="middle">-15</text>
+      <text x="629.6" y="824" text-anchor="middle">-10</text>
+      <text x="713.2" y="824" text-anchor="middle">-5</text>
+      <text x="796.8" y="824" text-anchor="middle">0</text>
+      <text x="880.4" y="824" text-anchor="middle">5</text>
+      <text x="964" y="824" text-anchor="middle">10</text>
+    </g>
+  </g>
+
+  <!-- LRA -->
+  <g>
+    <text x="1144" y="238" fill="#eef5ff" font-size="28" font-weight="700" font-family="Segoe UI, Roboto, Arial, sans-serif">Loudness Range (LRA)</text>
+    <text x="1144" y="270" fill="#8ea5bf" font-size="17" font-family="Segoe UI, Roboto, Arial, sans-serif">Vertical reference meter for dynamic spread and range overlays</text>
+
+    <text x="1322" y="336" fill="#d5e2f1" font-size="20" text-anchor="middle" font-family="Segoe UI, Roboto, Arial, sans-serif">Highly Dynamic</text>
+
+    <rect x="1248" y="360" width="148" height="544" rx="16" fill="#0f1822" stroke="#3a5069" stroke-width="2"/>
+    <rect x="1270" y="382" width="104" height="500" rx="12" fill="url(#lraGrad)" filter="url(#innerShadow)"/>
+
+    <!-- delineators every 5 LU -->
+    <g stroke="#c9d4df" stroke-opacity="0.4" stroke-width="1.2">
+      <line x1="1270" y1="882" x2="1374" y2="882"/>
+      <line x1="1270" y1="798.6667" x2="1374" y2="798.6667"/>
+      <line x1="1270" y1="715.3333" x2="1374" y2="715.3333"/>
+      <line x1="1270" y1="632" x2="1374" y2="632"/>
+      <line x1="1270" y1="548.6667" x2="1374" y2="548.6667"/>
+      <line x1="1270" y1="465.3333" x2="1374" y2="465.3333"/>
+      <line x1="1270" y1="382" x2="1374" y2="382"/>
+    </g>
+
+    <g fill="#c7d4e2" font-size="24" font-family="Segoe UI, Roboto, Arial, sans-serif">
+      <text x="1248" y="889" text-anchor="end">0</text>
+      <text x="1248" y="805.6667" text-anchor="end">5</text>
+      <text x="1248" y="722.3333" text-anchor="end">10</text>
+      <text x="1248" y="639" text-anchor="end">15</text>
+      <text x="1248" y="555.6667" text-anchor="end">20</text>
+      <text x="1248" y="472.3333" text-anchor="end">25</text>
+      <text x="1248" y="389" text-anchor="end">30</text>
+    </g>
+
+    <text x="1322" y="938" fill="#d5e2f1" font-size="20" text-anchor="middle" font-family="Segoe UI, Roboto, Arial, sans-serif">Compressed</text>
+  </g>
+
+  <!-- Assets panel -->
+  <g filter="url(#softShadow)">
+    <rect x="110" y="998" width="1480" height="320" rx="22" fill="#192330" stroke="#2f4258" stroke-width="2"/>
+    <rect x="110" y="998" width="1480" height="96" rx="22" fill="url(#panelGloss)"/>
+  </g>
+
+  <text x="146" y="1058" fill="#eef5ff" font-size="26" font-weight="700" font-family="Segoe UI, Roboto, Arial, sans-serif">Reusable Overlay Assets</text>
+  <text x="146" y="1088" fill="#8ea5bf" font-size="16" font-family="Segoe UI, Roboto, Arial, sans-serif">Standalone graphics for software placement and cropping</text>
+
+  <!-- Horizontal value bar asset -->
+  <text x="146" y="1160" fill="#d5e2f1" font-size="18" font-family="Segoe UI, Roboto, Arial, sans-serif">Horizontal Value Bar</text>
+  <rect x="146" y="1180" width="300" height="24" rx="12" fill="#0b1219" stroke="#314356"/>
+  <rect x="151" y="1185" width="290" height="14" rx="7" fill="url(#barGrad)"/>
+
+  <!-- Vertical value bar asset -->
+  <text x="680" y="1160" fill="#d5e2f1" font-size="18" font-family="Segoe UI, Roboto, Arial, sans-serif">Vertical Value Bar</text>
+  <rect x="734" y="1180" width="30" height="126" rx="15" fill="#0b1219" stroke="#314356"/>
+  <rect x="738" y="1184" width="22" height="118" rx="11" fill="url(#barGradV)"/>
+
+  <!-- Clip LED assets -->
+  <text x="950" y="1160" fill="#d5e2f1" font-size="18" font-family="Segoe UI, Roboto, Arial, sans-serif">Clip LED — Off</text>
+  <circle cx="1020" cy="1220" r="20" fill="url(#ledOff)" stroke="#7a2d2d" stroke-width="1.6"/>
+  <circle cx="1013" cy="1213" r="6" fill="#ffffff" fill-opacity="0.18"/>
+
+  <text x="1160" y="1160" fill="#d5e2f1" font-size="18" font-family="Segoe UI, Roboto, Arial, sans-serif">Clip LED — On</text>
+  <circle cx="1230" cy="1220" r="20" fill="url(#ledOn)" stroke="#ff8b8b" stroke-width="1.6" filter="url(#ledGlow)"/>
+  <circle cx="1223" cy="1213" r="6" fill="#ffffff" fill-opacity="0.35"/>
+</svg>

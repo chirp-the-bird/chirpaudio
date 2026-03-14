@@ -1,0 +1,16 @@
+# Enforce Unix line endings for Linux-hosted scripts and text assets
+*.py text eol=lf
+*.cgi text eol=lf
+*.sh text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+
+# Keep Windows command scripts in CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
