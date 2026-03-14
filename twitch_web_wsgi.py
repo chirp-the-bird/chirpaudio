@@ -247,7 +247,9 @@ def render_html():
   .form{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;}
   label{display:block;font-size:.86rem;color:var(--muted);margin:.5rem 0 .2rem;}
     input,select{width:100%;box-sizing:border-box;padding:9px;border-radius:8px;border:1px solid #3a4a67;background:#111824;color:var(--text);}
-  button{margin-top:.8rem;background:var(--accent);color:white;border:none;border-radius:8px;padding:10px 14px;cursor:pointer}
+    .inline-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}
+    .sample-seconds-compact{max-width:120px}
+    button{display:block;margin-top:.8rem;background:var(--accent);color:white;border:none;border-radius:8px;padding:10px 14px;cursor:pointer}
   button:hover{filter:brightness(1.08)}
     .out{margin-top:16px;order:4}
     pre{background:#0f141d;border:1px solid var(--border);border-radius:10px;padding:12px;min-height:220px;max-height:60vh;overflow:auto;white-space:pre-wrap}
@@ -317,7 +319,7 @@ def render_html():
   .hint{font-size:.82rem;color:var(--muted)}
     @media (max-width:860px){.grid{grid-template-columns:1fr}.meter-board{grid-template-columns:1fr}}
                 @media (max-width:1100px){.wrap{grid-template-columns:1fr;}.sidebar{grid-column:1;align-items:center;padding-right:0;padding-bottom:20px;}.main{grid-column:1;}}
-                @media (max-width:760px){.meter-row{grid-template-columns:1fr;}.clip-box{min-height:80px;padding:12px}.meter-fill.vertical{height:300px}.vertical-labels{height:300px}.vertical-layout{transform:translateX(-18px)}}
+                @media (max-width:760px){.inline-fields{grid-template-columns:1fr}.sample-seconds-compact{max-width:100%}.meter-row{grid-template-columns:1fr;}.clip-box{min-height:80px;padding:12px}.meter-fill.vertical{height:300px}.vertical-labels{height:300px}.vertical-layout{transform:translateX(-18px)}}
 </style>
 </head>
 <body>
@@ -343,7 +345,7 @@ def render_html():
           <label>Channel</label>
           <input name="channel" value="willowstephens" required />
                     <label>Sample Seconds</label>
-                    <select name="sample_seconds">
+                    <select class="sample-seconds-compact" name="sample_seconds">
                         <option value="15">15</option>
                         <option value="30" selected>30</option>
                         <option value="60">60</option>
@@ -357,29 +359,35 @@ def render_html():
           <input type="hidden" name="mode" value="vod" />
           <label>VOD URL</label>
           <input name="vod_url" placeholder="https://www.twitch.tv/videos/123456789" />
-          <label>Start Time (HH:MM:SS)</label>
-          <input name="start_time" placeholder="00:00:00" />
-                    <label>Sample Seconds</label>
-                    <select name="sample_seconds">
-                        <option value="15">15</option>
-                        <option value="30" selected>30</option>
-                        <option value="60">60</option>
-                        <option value="120">120</option>
-                    </select>
+                    <div class="inline-fields">
+                        <div>
+                            <label>Start Time (HH:MM:SS)</label>
+                            <input name="start_time" placeholder="00:00:00" />
+                        </div>
+                        <div>
+                            <label>Sample Seconds</label>
+                            <select name="sample_seconds">
+                                    <option value="15">15</option>
+                                    <option value="30" selected>30</option>
+                                    <option value="60">60</option>
+                                    <option value="120">120</option>
+                            </select>
+                        </div>
+                    </div>
           <button type="submit">Run VOD Test</button>
         </form>
       </div>
 
             <div class="results">
                 <h3>Results</h3>
-                <div class="hint">Structured analyzer data for driving the meter rendering. Meter config is available at <a href="/meter_config.json" target="_blank" rel="noopener noreferrer">/meter_config.json</a>.</div>
+                <div id="resultsHint" class="hint">Generate audio meters with RMS level and peak, LUFS Loudness and True Peak, clipping indicators and Loudness range.</div>
                                                                 <div id="meterWrap" class="meter-wrap">
                                                                         <p id="meterStatus" class="meter-status">Waiting for run...</p>
                                                                                                                                                 <div id="meterBoard" class="meter-board">
                                                                             <div class="meter-stack">
                                                                                 <section class="meter-panel">
                                                                                     <h4 class="meter-title">RMS Loudness</h4>
-                                                                                    <p class="meter-copy">Static software-style reference meter for RMS average, peak, and dynamic range overlays.</p>
+                                                                                    <p class="meter-copy">Audio sample RMS average loudness and RMS peak level (in dBFS).</p>
                                                                                     <div class="meter-row">
                                                                                         <div>
                                                                                             <div class="meter-range"><span>-50 dB</span><span>0 dB</span></div>
@@ -401,7 +409,7 @@ def render_html():
 
                                                                                 <section class="meter-panel">
                                                                                     <h4 class="meter-title">LUFS Loudness</h4>
-                                                                                    <p class="meter-copy">Integrated loudness reference meter for LUFS and true-peak overlays.</p>
+                                                                                    <p class="meter-copy">Audio sample Integrated loudness (LUFS) and True Peak (dBTPK).</p>
                                                                                     <div class="meter-row">
                                                                                         <div>
                                                                                             <div class="meter-range"><span>-40 LUFS</span><span>10 LUFS</span></div>
@@ -424,7 +432,7 @@ def render_html():
 
                                                                             <section class="meter-panel lra-panel">
                                                                                 <h4 class="meter-title">Loudness Range (LRA)</h4>
-                                                                                <p class="meter-copy">Vertical reference meter for dynamic spread and range overlays.</p>
+                                                                                <p class="meter-copy">Audio sample Loudness Range (LRA) indicating dynamic spread/compression.</p>
                                                                                 <div class="vertical-ends">
                                                                                     <span>Highly Dynamic</span>
                                                                                 </div>
@@ -612,15 +620,19 @@ function renderMeters(payload){
 async function runForm(form){
   const out = document.getElementById('output');
     const meterWrap = document.getElementById('meterWrap');
+        const resultsHint = document.getElementById('resultsHint');
     const meterStatus = document.getElementById('meterStatus');
     const meterBoard = document.getElementById('meterBoard');
     const meterNote = document.getElementById('meterNote');
     const startedAt = new Date().toLocaleString();
-    if (out.textContent && out.textContent.trim() !== 'Ready.'){
+    if ((out.textContent || '').trim() === 'Ready.'){
+        out.textContent = '';
+    } else if (out.textContent && out.textContent.trim()){
         out.textContent += '\\n';
     }
     out.textContent += `===== ${startedAt} =====\\n`;
     meterWrap.style.display = 'block';
+    if (resultsHint) resultsHint.style.display = 'block';
     meterBoard.style.display = 'none';
     meterNote.style.display = 'none';
     meterStatus.innerHTML = '<span class="processing-indicator"><span class="processing-spinner" aria-hidden="true"></span>Processing...</span>';
@@ -652,13 +664,14 @@ async function runForm(form){
             const ch = src.channel || src.channelName || src.user_name || src.userName || src.broadcaster_login || src.broadcasterLogin || '';
             const title = src.title || src.streamTitle || '';
             gotResult = true;
+            if (resultsHint) resultsHint.style.display = 'none';
             meterBoard.style.display = 'grid';
             meterNote.style.display = 'block';
             meterStatus.innerHTML = (ch ? '<strong class="meter-channel-name">' + escHtml(ch) + '</strong>' : '') +
                 (title ? '<span class="meter-source-title">' + escHtml(title) + '</span>' : (!ch ? 'Results received.' : ''));
             lastResultPayload = payload;
             renderMeters(payload);
-            meterNote.textContent = 'Overlay bars and value labels are now mapped from result JSON. CLIP indicators switch on for RMS sample clipping and LUFS true-peak clipping.';
+            meterNote.textContent = 'Meter green zones indicate target ranges for audio level. Avoid only the very dark and light. Peak lines turn yellow or red to indicate loud audio/risk of clipping. Consistent clipping should not be ignored. Loudness Range (LRA) indicates dynamic spread; higher is more dynamic, lower is more compressed.';
         } catch (err) {
             meterStatus.textContent = 'Result parse error';
             meterBoard.style.display = 'none';
