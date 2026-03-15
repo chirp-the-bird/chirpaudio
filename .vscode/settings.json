@@ -1,5 +1,16 @@
 {
   "files.associations": {
     "VERSION": "plaintext"
-  }
+  },
+  // Exclude the twitch_tokens.json file from the file explorer pane and search results in case you screen share VSCode.
+  "files.exclude": {
+    "**/twitch_tokens.json": true
+  },
+  "python-envs.pythonProjects": [
+    {
+      "path": ".",
+      "envManager": "ms-python.python:venv",
+      "packageManager": "ms-python.python:pip"
+    }
+  ]
 }

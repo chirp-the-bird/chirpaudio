@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import warnings
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlparse
 import select
 import fcntl
 from threading import Thread
@@ -104,7 +104,14 @@ def safe_main():
                 start_time = (getfirst(form, "start_time") or "").strip()
                 if not vod_url:
                     raise ValueError("Missing VOD URL.")
-                if "twitch.tv" not in vod_url.lower():
+                try:
+                    _parsed_vod = urlparse(vod_url)
+                    _netloc = _parsed_vod.netloc.lower().split(":")[0]
+                except Exception:
+                    raise ValueError("Invalid VOD URL.")
+                if _parsed_vod.scheme not in ("http", "https"):
+                    raise ValueError("VOD URL must use https://.")
+                if _netloc not in ("www.twitch.tv", "twitch.tv"):
                     raise ValueError("VOD URL must be a twitch.tv URL.")
                 cmd += ["--vod-url", vod_url, "--sample-seconds", str(sample_seconds)]
                 if start_time:

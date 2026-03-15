@@ -273,9 +273,12 @@ def get_stream_info(channel, client_id, token):
     # print("Rate headers:", rate_headers)
     
     if r.status_code != 200:
-        print(f"Error: HTTP {r.status_code}")
-        print(f"Response: {r.text}")
-        return None, (r.text or "")
+        response_text = r.text or ""
+        is_token_error = r.status_code == 401 and "invalid oauth token" in response_text.lower()
+        if DEBUG or not is_token_error:
+            print(f"Error: HTTP {r.status_code}")
+            print(f"Response: {response_text}")
+        return None, response_text
     
     data = r.json()
     if not data.get("data"):
@@ -911,7 +914,7 @@ def main():
                 )
                 print("  Note: sample hard-clips and true-peak clip events are different measurements and not 1:1 comparable.")
             elif tp >= -1.0:
-                print("  *** TRUE-PEAK NEAR LIMIT: possible clipping risk (>= -1.0 dBTP) ***")
+                print("  *** TRUE-PEAK NEAR LIMIT: (>= -1.0 dBTP) Clipping Risk. ***")
             else:
                 print("  No True-peak clipping detected")
         else:

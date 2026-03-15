@@ -3,11 +3,13 @@
 import mimetypes
 import sys
 import warnings
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlparse
 import os
 import re
 import subprocess
 import time
+import json
+from datetime import datetime, timezone
 from threading import Thread
 from queue import Queue, Empty
 
@@ -20,6 +22,7 @@ warnings.showwarning = _warning_to_stderr
 warnings.simplefilter("default")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+WWW_DIR = os.path.join(BASE_DIR, "www")
 ANALYZER = os.path.join(BASE_DIR, "twitch_audio_test.py")
 RESULT_JSON_PREFIX = "CHIRPAUDIO_RESULT_JSON:"
 STATIC_ASSETS = {
@@ -27,6 +30,12 @@ STATIC_ASSETS = {
     "/loudness_meter.svg": "loudness_meter.svg",
 }
 VERSION_FILE = os.path.join(BASE_DIR, "VERSION")
+AUDIT_LOG_FILE = os.path.join(BASE_DIR, "activity_audit.jsonl")
+
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
 
 
 def load_app_version():
@@ -43,6 +52,43 @@ APP_VERSION = load_app_version()
 
 CHANNEL_RE = re.compile(r"^[A-Za-z0-9_]{2,25}$")
 HHMMSS_RE = re.compile(r"^\d+:[0-5]\d:[0-5]\d$")
+
+
+def get_client_ip(environ):
+    # Prefer first forwarded IP when behind a trusted reverse proxy.
+    forwarded_for = (environ.get("HTTP_X_FORWARDED_FOR") or "").strip()
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return (environ.get("REMOTE_ADDR") or "").strip()
+
+
+def _lock_file(file_obj):
+    if os.name == "nt":
+        file_obj.seek(0)
+        msvcrt.locking(file_obj.fileno(), msvcrt.LK_LOCK, 1)
+    else:
+        fcntl.flock(file_obj.fileno(), fcntl.LOCK_EX)
+
+
+def _unlock_file(file_obj):
+    if os.name == "nt":
+        file_obj.seek(0)
+        msvcrt.locking(file_obj.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        fcntl.flock(file_obj.fileno(), fcntl.LOCK_UN)
+
+
+def append_audit_record(record):
+    serialized = (json.dumps(record, ensure_ascii=True, separators=(",", ":")) + "\n").encode("utf-8")
+    with open(AUDIT_LOG_FILE, "a+b") as audit_file:
+        _lock_file(audit_file)
+        try:
+            audit_file.seek(0, os.SEEK_END)
+            audit_file.write(serialized)
+            audit_file.flush()
+            os.fsync(audit_file.fileno())
+        finally:
+            _unlock_file(audit_file)
 
 
 def as_int(value, default, min_v=1, max_v=360):
@@ -95,7 +141,14 @@ def build_command(form):
         start_time = (getfirst(form, "start_time") or "").strip()
         if not vod_url:
             raise ValueError("Missing VOD URL.")
-        if "twitch.tv" not in vod_url.lower():
+        try:
+            _parsed_vod = urlparse(vod_url)
+            _netloc = _parsed_vod.netloc.lower().split(":")[0]
+        except Exception:
+            raise ValueError("Invalid VOD URL.")
+        if _parsed_vod.scheme not in ("http", "https"):
+            raise ValueError("VOD URL must use https://.")
+        if _netloc not in ("www.twitch.tv", "twitch.tv"):
             raise ValueError("VOD URL must be a twitch.tv URL.")
         cmd += ["--vod-url", vod_url, "--sample-seconds", str(sample_seconds)]
         if start_time:
@@ -112,7 +165,9 @@ def serve_static_asset(path_info, start_response):
     if not asset_name:
         return None
 
-    file_path = os.path.join(BASE_DIR, asset_name)
+    preferred_path = os.path.join(WWW_DIR, asset_name)
+    fallback_path = os.path.join(BASE_DIR, asset_name)
+    file_path = preferred_path if os.path.isfile(preferred_path) else fallback_path
     if not os.path.isfile(file_path):
         start_response("404 Not Found", [("Content-Type", "text/plain; charset=utf-8")])
         return [f"Missing asset: {asset_name}\n".encode("utf-8")]
@@ -239,7 +294,8 @@ def render_html():
     .img-stack img{position:relative;z-index:1;width:300px;display:block;margin-top:20px;}
         .sidebar > img{display:block;width:300px;max-width:300px;}
     .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;box-shadow:0 10px 35px rgba(0,0,0,.35);display:flex;flex-direction:column}
-  h1{margin:.2rem 0 1rem;display:flex;align-items:center;gap:.6rem;}
+  h1{margin:.2rem 0 1rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;}
+      .title-text{white-space:nowrap}
         .app-version{margin-left:auto;font-size:.82rem;color:var(--muted);font-weight:600;letter-spacing:.02em}
     h3{margin:0 0 .6rem}
   .logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent2),var(--accent));display:inline-block;}
@@ -305,6 +361,7 @@ def render_html():
                 .scale-labels.horizontal-11 span:nth-child(11){left:100%;transform:translateX(-50%);text-align:center;min-width:22px}
                 .clip-box{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:#111824;border:1px solid #2e3d53;border-radius:12px;min-height:132px}
                 .clip-label{font-size:.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+                .clip-label.active{color:#ff9a9a}
                 .clip-led{width:21px;height:21px;border-radius:50%;background:linear-gradient(180deg,#5b1717,#2a0a0a);border:1px solid #7a2d2d;box-shadow:inset 0 1px 2px rgba(255,255,255,.08)}
                 .clip-led.active{background:radial-gradient(circle at 35% 30%,#ffd5d5 0%,#ff6c6c 35%,#cb1111 68%,#5b0a0a 100%);border-color:#ff7171;box-shadow:0 0 10px rgba(255,80,80,.78),inset 0 1px 3px rgba(255,255,255,.3)}
                 .value-marker.warn-near{background:#ffe26f;box-shadow:0 0 8px rgba(255,226,111,.8)}
@@ -319,7 +376,7 @@ def render_html():
   .hint{font-size:.82rem;color:var(--muted)}
     @media (max-width:860px){.grid{grid-template-columns:1fr}.meter-board{grid-template-columns:1fr}}
                 @media (max-width:1100px){.wrap{grid-template-columns:1fr;}.sidebar{grid-column:1;align-items:center;padding-right:0;padding-bottom:20px;}.main{grid-column:1;}}
-                @media (max-width:760px){.inline-fields{grid-template-columns:1fr}.sample-seconds-compact{max-width:100%}.meter-row{grid-template-columns:1fr;}.clip-box{min-height:80px;padding:12px}.meter-fill.vertical{height:300px}.vertical-labels{height:300px}.vertical-layout{transform:translateX(-18px)}}
+                @media (max-width:760px){.inline-fields{grid-template-columns:1fr}.sample-seconds-compact{max-width:100%}.meter-row{grid-template-columns:1fr;}.meter-row .clip-box{width:84px;justify-self:end}.clip-box{min-height:80px;padding:12px}.meter-fill.vertical{height:300px}.vertical-labels{height:300px}.vertical-layout{transform:translateX(-18px)}h1{align-items:flex-start}.app-version{margin-left:0;width:100%;display:block;margin-top:4px}}
 </style>
 </head>
 <body>
@@ -335,15 +392,15 @@ def render_html():
     </div>
     <div class="main">
     <div class="card">
-    <h1><span class="logo"></span> Twitch Audio Test <span class="app-version">v __APP_VERSION__</span></h1>
-      <div class="hint">Runs Chirpaudio Twitch Audio Test for a live stream or VOD.</div>
+    <h1><span class="logo"></span><span class="title-text">Twitch Audio Test</span><span class="app-version">v __APP_VERSION__</span></h1>
+      <div class="hint">Runs Chirpaudio Audio Analyzer for a Twitch live stream or VOD.</div>
 
       <div class="grid">
         <form id="liveForm" class="form" method="post" action="">
           <h3>Live Channel</h3>
           <input type="hidden" name="mode" value="live" />
           <label>Channel</label>
-          <input name="channel" value="willowstephens" required />
+          <input id="channelInput" name="channel" value="willowstephens" required />
                     <label>Sample Seconds</label>
                     <select class="sample-seconds-compact" name="sample_seconds">
                         <option value="15">15</option>
@@ -505,6 +562,11 @@ function setClipLed(id, isActive){
     const led = document.getElementById(id);
     if (!led) return;
     led.classList.toggle('active', !!isActive);
+    const clipBox = led.closest('.clip-box');
+    const label = clipBox ? clipBox.querySelector('.clip-label') : null;
+    if (label){
+        label.classList.toggle('active', !!isActive);
+    }
 }
 
 function hideMarker(markerId){
@@ -671,7 +733,7 @@ async function runForm(form){
                 (title ? '<span class="meter-source-title">' + escHtml(title) + '</span>' : (!ch ? 'Results received.' : ''));
             lastResultPayload = payload;
             renderMeters(payload);
-            meterNote.textContent = 'Meter green zones indicate target ranges for audio level. Avoid only the very dark and light. Peak lines turn yellow or red to indicate loud audio/risk of clipping. Consistent clipping should not be ignored. Loudness Range (LRA) indicates dynamic spread; higher is more dynamic, lower is more compressed.';
+            meterNote.textContent = 'Meter green zones indicate target ranges for audio loudness levels. Avoid only the very dark and light. For optimal signal strength, peaks should approach light but never clip (0 dB). Peak indicators turn yellow or red to indicate loud audio/risk of clipping. Clipping indicates the signal is too loud. Consistent clipping can damage audio equipment and should not be ignored. Loudness Range (LRA) indicates perceived dynamic range. Highly dynamic audio varies in loudness. Highly compressed audio has steady loudness.';
         } catch (err) {
             meterStatus.textContent = 'Result parse error';
             meterBoard.style.display = 'none';
@@ -711,6 +773,16 @@ async function runForm(form){
 }
 document.getElementById('liveForm').addEventListener('submit', e => { e.preventDefault(); runForm(e.target); });
 document.getElementById('vodForm').addEventListener('submit', e => { e.preventDefault(); runForm(e.target); });
+const channelInput = document.getElementById('channelInput');
+if (channelInput){
+    channelInput.addEventListener('focus', () => {
+        channelInput.select();
+    });
+    channelInput.addEventListener('mouseup', (evt) => {
+        evt.preventDefault();
+        channelInput.select();
+    });
+}
 window.addEventListener('resize', () => {
     if (lastResultPayload){
         renderMeters(lastResultPayload);
@@ -763,6 +835,8 @@ def application(environ, start_response):
                     yield f"event: {event_name}\ndata: {line}\n\n".encode("utf-8")
 
             def generate():
+                result_payload = None
+                result_payload_raw = None
                 events = stream_generator(cmd)
                 # Initial SSE padding helps defeat intermediary/browser buffering.
                 yield b":" + (b" " * 4096) + b"\n\n"
@@ -771,6 +845,11 @@ def application(environ, start_response):
                 try:
                     for event in events:
                         if event["type"] == "result":
+                            result_payload_raw = event["json"]
+                            try:
+                                result_payload = json.loads(event["json"])
+                            except json.JSONDecodeError:
+                                result_payload = None
                             yield from sse_event("result", event["json"])
                         elif event["type"] == "keepalive":
                             yield b": keepalive\n\n"
@@ -779,6 +858,17 @@ def application(environ, start_response):
                     yield b"event: done\ndata: done\n\n"
                 finally:
                     events.close()
+                    audit_record = {
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "ip": get_client_ip(environ),
+                        "request_args": form,
+                        "response_json": result_payload if result_payload is not None else result_payload_raw,
+                    }
+                    try:
+                        append_audit_record(audit_record)
+                    except Exception as exc:
+                        sys.stderr.write(f"Audit log write failed: {exc}\n")
+                        sys.stderr.flush()
 
             return generate()
         else:
