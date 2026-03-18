@@ -31,6 +31,7 @@ STATIC_ASSETS = {
 }
 VERSION_FILE = os.path.join(BASE_DIR, "VERSION")
 AUDIT_LOG_FILE = os.path.join(BASE_DIR, "activity_audit.jsonl")
+AUDIOTEST_ERROR_LOG_FILE = os.path.join(BASE_DIR, "audiotest_error.jsonl")
 
 if os.name == "nt":
     import msvcrt
@@ -89,6 +90,19 @@ def append_audit_record(record):
             os.fsync(audit_file.fileno())
         finally:
             _unlock_file(audit_file)
+
+
+def append_audiotest_error_record(record):
+    serialized = (json.dumps(record, ensure_ascii=True, separators=(",", ":")) + "\n").encode("utf-8")
+    with open(AUDIOTEST_ERROR_LOG_FILE, "a+b") as error_file:
+        _lock_file(error_file)
+        try:
+            error_file.seek(0, os.SEEK_END)
+            error_file.write(serialized)
+            error_file.flush()
+            os.fsync(error_file.fileno())
+        finally:
+            _unlock_file(error_file)
 
 
 def as_int(value, default, min_v=1, max_v=360):
@@ -191,6 +205,7 @@ def stream_generator(cmd):
     """Generator that yields structured subprocess events as they arrive."""
     proc = None
     t = None
+    started_monotonic = time.monotonic()
     try:
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
@@ -210,7 +225,14 @@ def stream_generator(cmd):
             errors="replace",
         )
     except Exception as exc:
-        yield {"type": "stdout", "text": f"Failed to start process: {exc}\n"}
+        failure_text = f"Failed to start process: {exc}\n"
+        yield {"type": "stdout", "text": failure_text}
+        yield {
+            "type": "process_end",
+            "rc": -1,
+            "duration_ms": int((time.monotonic() - started_monotonic) * 1000),
+            "full_output": failure_text,
+        }
         return
 
     q: Queue = Queue()
@@ -229,6 +251,7 @@ def stream_generator(cmd):
     keepalive_interval = 8.0
     last_keepalive = time.monotonic()
     done = False
+    full_output_parts = []
     try:
         while not done:
             try:
@@ -245,6 +268,7 @@ def stream_generator(cmd):
             if item is None:
                 done = True
             else:
+                full_output_parts.append(item)
                 stripped = item.rstrip("\r\n")
                 if stripped.startswith(RESULT_JSON_PREFIX):
                     yield {"type": "result", "json": stripped[len(RESULT_JSON_PREFIX):].strip()}
@@ -252,6 +276,13 @@ def stream_generator(cmd):
                     yield {"type": "stdout", "text": item}
 
         rc = proc.wait()
+        duration_ms = int((time.monotonic() - started_monotonic) * 1000)
+        yield {
+            "type": "process_end",
+            "rc": rc,
+            "duration_ms": duration_ms,
+            "full_output": "".join(full_output_parts),
+        }
         if rc == 0:
             yield {"type": "stdout", "text": "Done.\n"}
         else:
@@ -278,7 +309,25 @@ def render_html():
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <meta name="color-scheme" content="dark" />
-<title>Twitch Audio Tester</title>
+<title>Twitch Audio Test</title>
+<meta name="description" content="Audio analysis tool for Twitch streamers." />
+
+<!-- Open Graph -->
+<meta property="og:title" content="Chirp Audio - Twitch Audio Test" />
+<meta property="og:description" content="Audio analysis tool for Twitch streamers." />
+<meta property="og:image" content="https://chirpaudio.com/ChirpAudio.png" />
+<meta property="og:image:secure_url" content="https://chirpaudio.com/ChirpAudio.png" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:alt" content="ChirpAudio logo preview image" />
+<meta property="og:url" content="https://chirpaudio.com/twitch" />
+<meta property="og:type" content="website" />
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Chirp Audio - Twitch Audio Test" />
+<meta name="twitter:description" content="Audio analysis tool for Twitch streamers." />
+<meta name="twitter:image" content="https://chirpaudio.com/ChirpAudio.png" />
+<meta name="twitter:image:alt" content="ChirpAudio logo preview image" />
 <style>
   :root{
     --bg:#12161d;--panel:#1b2330;--panel2:#222d3d;--text:#dbe7ff;--muted:#9fb0cc;
@@ -837,6 +886,9 @@ def application(environ, start_response):
             def generate():
                 result_payload = None
                 result_payload_raw = None
+                process_rc = None
+                process_duration_ms = None
+                process_full_output = ""
                 events = stream_generator(cmd)
                 # Initial SSE padding helps defeat intermediary/browser buffering.
                 yield b":" + (b" " * 4096) + b"\n\n"
@@ -851,6 +903,10 @@ def application(environ, start_response):
                             except json.JSONDecodeError:
                                 result_payload = None
                             yield from sse_event("result", event["json"])
+                        elif event["type"] == "process_end":
+                            process_rc = event.get("rc")
+                            process_duration_ms = event.get("duration_ms")
+                            process_full_output = event.get("full_output") or ""
                         elif event["type"] == "keepalive":
                             yield b": keepalive\n\n"
                         else:
@@ -864,11 +920,52 @@ def application(environ, start_response):
                         "request_args": form,
                         "response_json": result_payload if result_payload is not None else result_payload_raw,
                     }
+                    if isinstance(result_payload, dict):
+                        ad_handling = (
+                            result_payload.get("analysis", {}).get("adHandling", {})
+                            if isinstance(result_payload.get("analysis"), dict)
+                            else {}
+                        )
+                        audit_record["ad_summary"] = {
+                            "pre_roll_detected": bool(ad_handling.get("preRollDetected")),
+                            "pre_roll_wait_seconds": int(ad_handling.get("preRollWaitSeconds", 0) or 0),
+                            "mid_roll_detected": bool(ad_handling.get("midRollDetected")),
+                            "mid_roll_wait_seconds": int(ad_handling.get("midRollWaitSeconds", 0) or 0),
+                            "ad_event_count": int(ad_handling.get("adEventCount", 0) or 0),
+                            "total_ad_wait_seconds": int(ad_handling.get("totalAdWaitSeconds", 0) or 0),
+                        }
                     try:
                         append_audit_record(audit_record)
                     except Exception as exc:
                         sys.stderr.write(f"Audit log write failed: {exc}\n")
                         sys.stderr.flush()
+
+                    if process_rc is None:
+                        process_rc = -1
+                    if process_duration_ms is None:
+                        process_duration_ms = 0
+
+                    if int(process_rc) != 0:
+                        mode = (getfirst(form, "mode") or "").strip().lower()
+                        if mode == "vod":
+                            target = (getfirst(form, "vod_url") or "").strip()
+                        else:
+                            target = (getfirst(form, "channel") or "").strip()
+
+                        error_record = {
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "mode": mode,
+                            "target": target,
+                            "sample_seconds": as_int(getfirst(form, "sample_seconds", "30"), 30),
+                            "duration_ms": int(process_duration_ms),
+                            "rc": int(process_rc),
+                            "full_output": process_full_output,
+                        }
+                        try:
+                            append_audiotest_error_record(error_record)
+                        except Exception as exc:
+                            sys.stderr.write(f"Error log write failed: {exc}\n")
+                            sys.stderr.flush()
 
             return generate()
         else:

@@ -32,6 +32,8 @@ import sys
 import datetime
 import json
 import time
+import tempfile
+from typing import Optional
 
 import requests
 
@@ -353,10 +355,114 @@ def refresh_token_via_script() -> bool:
     return True
 
 
+# Fixed Unix/macOS candidate paths checked in order.
+_CHROMIUM_UNIX_CANDIDATES = [
+    # Wrapper script that adds --no-sandbox (needed on headless Linux servers)
+    "/usr/local/bin/chromium-nosandbox",
+    # Common Linux locations
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chromium",
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/snap/bin/chromium",
+    # macOS
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+]
+
+# Relative paths appended under each Windows env-var root at runtime.
+_CHROMIUM_WIN_RELATIVE_PATHS = [
+    r"Google\Chrome\Application\chrome.exe",
+    r"Chromium\Application\chrome.exe",
+    r"Google\Chrome Beta\Application\chrome.exe",
+]
+
+_CHROMIUM_WIN_ENV_ROOTS = [
+    "PROGRAMFILES",
+    "PROGRAMFILES(X86)",
+    "LOCALAPPDATA",
+]
+
+
+def _find_chromium() -> Optional[str]:
+    """Return the first Chromium-compatible executable found on this system.
+
+    Checks known fixed paths on Unix/macOS, builds Windows paths from
+    environment variables at runtime, then falls back to a PATH lookup.
+    Supports Python 3.9+ and runs on both Windows and Unix without changes.
+    """
+    candidates: list = list(_CHROMIUM_UNIX_CANDIDATES)
+
+    # Build Windows candidate paths dynamically from environment variables so
+    # we handle per-user installs (LOCALAPPDATA) and non-default drive letters.
+    if os.name == "nt":
+        for env_var in _CHROMIUM_WIN_ENV_ROOTS:
+            root = os.environ.get(env_var, "")
+            if root:
+                for rel in _CHROMIUM_WIN_RELATIVE_PATHS:
+                    candidates.append(os.path.join(root, rel))
+
+    for candidate in candidates:
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+
+    # Fall back to PATH lookup — handles any install location and Windows
+    # installs that register chrome/chromium on the system PATH.
+    for name in ("chromium-browser", "chromium", "google-chrome", "google-chrome-stable", "chrome"):
+        found = shutil.which(name)
+        if found:
+            return found
+
+    return None
+
+
+def _wrap_chromium_for_linux(browser_path: str, extra_flags: Optional[str] = None) -> str:
+    """Return a Linux wrapper that launches Chromium with required flags."""
+    if not browser_path:
+        return browser_path
+    if os.name == "nt":
+        return browser_path
+    if not sys.platform.startswith("linux"):
+        return browser_path
+    if os.path.basename(browser_path) == "chromium-nosandbox":
+        return browser_path
+
+    flags = (extra_flags or "--no-sandbox").strip()
+    if not flags:
+        flags = "--no-sandbox"
+
+    safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(browser_path))
+    safe_flags = re.sub(r"[^A-Za-z0-9._-]", "_", flags)
+    wrapper_path = os.path.join(tempfile.gettempdir(), f"chirpaudio-{safe_name}-{safe_flags}")
+    wrapper_content = f"#!/bin/sh\nexec \"{browser_path}\" {flags} \"$@\"\n"
+
+    try:
+        with open(wrapper_path, "w", encoding="utf-8") as handle:
+            handle.write(wrapper_content)
+        os.chmod(wrapper_path, 0o755)
+        return wrapper_path
+    except Exception as exc:
+        debug_print(f"  Could not create Linux Chromium wrapper: {exc}")
+        return browser_path
+
+
 def get_hls_url(source, client_id=None, token=None, is_vod=False):
     """Get HLS URL for a channel or VOD using streamlink with optional authentication."""
     session = Streamlink()
-    
+
+    # Point streamlink at a real browser when one is available so Twitch's
+    # client-integrity token can be obtained (needed to avoid
+    # PersistedQueryNotFound errors on recent streamlink/Twitch combinations).
+    # Fall back gracefully when no browser is present — some streams still work.
+    browser = _find_chromium()
+    if browser:
+        browser = _wrap_chromium_for_linux(browser)
+        session.set_option("webbrowser-executable", browser)
+        debug_print(f"  Chromium found: {browser}")
+    else:
+        session.set_option("webbrowser", False)
+        debug_print("  No Chromium found; client-integrity token unavailable")
+
     # Authenticate streamlink with Twitch OAuth token to reduce pre-roll ads
     if client_id and token:
         session.set_option("http-headers", {
@@ -366,12 +472,61 @@ def get_hls_url(source, client_id=None, token=None, is_vod=False):
         print(f"✓ Using authenticated session (may reduce ads)")
 
     source_url = source if is_vod else f"https://twitch.tv/{source}"
-    
-    try:
-        streams = session.streams(source_url)
-    except Exception as e:
-        print(f"Error: {e}")
-        return None
+
+    streams = None
+    browser_errors = []
+    if browser:
+        browser_candidates = [browser]
+        if sys.platform.startswith("linux"):
+            # First try a light wrapper, then a hardened profile for low-memory VPS hosts.
+            browser_candidates = [
+                _wrap_chromium_for_linux(browser, "--no-sandbox"),
+                _wrap_chromium_for_linux(
+                    browser,
+                    "--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --no-zygote",
+                ),
+            ]
+
+        # Keep order but remove duplicates.
+        seen = set()
+        ordered_candidates = []
+        for candidate in browser_candidates:
+            if candidate and candidate not in seen:
+                seen.add(candidate)
+                ordered_candidates.append(candidate)
+
+        for candidate in ordered_candidates:
+            session.set_option("webbrowser-executable", candidate)
+            debug_print(f"  Trying Chromium launch profile: {candidate}")
+            try:
+                streams = session.streams(source_url)
+                break
+            except Exception as e:
+                error_str = str(e)
+                browser_failure = (
+                    "127.0.0.1" in error_str
+                    or "webbrowser" in error_str.lower()
+                    or "integrity" in error_str.lower()
+                    or "connection refused" in error_str.lower()
+                )
+                if browser_failure:
+                    browser_errors.append(error_str)
+                    continue
+                print(f"Error: {e}")
+                return None
+
+    if streams is None:
+        if browser and browser_errors:
+            print("Browser CDP launch failed for all Chromium profiles, retrying without browser...")
+            if DEBUG:
+                for idx, err in enumerate(browser_errors, 1):
+                    print(f"  Browser attempt {idx}: {err}")
+        session.set_option("webbrowser", False)
+        try:
+            streams = session.streams(source_url)
+        except Exception as e:
+            print(f"Error: {e}")
+            return None
     
     if not streams:
         label = "VOD" if is_vod else source
@@ -462,21 +617,29 @@ def hls_playlist_has_ad(hls_url: str) -> bool:
         return False
 
 
-def wait_for_no_ads(hls_url: str, context: str) -> None:
+def wait_for_no_ads(hls_url: str, context: str) -> dict:
+    stats = {
+        "detected": False,
+        "wait_seconds": 0,
+        "context": context,
+    }
     if not AD_DETECTION_ENABLED:
-        return
+        return stats
     if not hls_playlist_has_ad(hls_url):
-        return
+        return stats
 
+    stats["detected"] = True
     print(f"Ad detected ({context}). Waiting for ad to finish...")
     waited = 0
     while waited < AD_MAX_WAIT_SECONDS:
         if not hls_playlist_has_ad(hls_url):
+            stats["wait_seconds"] = waited
             print("Ad finished. Resuming analysis.")
-            return
+            return stats
         time.sleep(AD_POLL_INTERVAL_SECONDS)
         waited += AD_POLL_INTERVAL_SECONDS
 
+    stats["wait_seconds"] = waited
     print("Ad still present after max wait; aborting analysis.")
     raise RuntimeError("Ad timeout exceeded; aborting analysis to avoid ad audio.")
 
@@ -488,13 +651,31 @@ def capture_audio_with_ad_handling(hls_url, ffmpeg_cmd, sample_seconds, start_se
     remaining = sample_seconds
     chunk_seconds = 5
     attempts_without_audio = 0
+    ad_stats = {
+        "pre_roll_detected": False,
+        "pre_roll_wait_seconds": 0,
+        "mid_roll_detected": False,
+        "mid_roll_wait_seconds": 0,
+        "ad_event_count": 0,
+        "total_ad_wait_seconds": 0,
+    }
 
     # Handle pre-roll ads
-    wait_for_no_ads(hls_url, "pre-roll")
+    pre_roll = wait_for_no_ads(hls_url, "pre-roll")
+    if pre_roll["detected"]:
+        ad_stats["pre_roll_detected"] = True
+        ad_stats["ad_event_count"] += 1
+    ad_stats["pre_roll_wait_seconds"] += int(pre_roll["wait_seconds"])
+    ad_stats["total_ad_wait_seconds"] += int(pre_roll["wait_seconds"])
 
     while remaining > 0:
         # If an ad appears mid-stream, wait before capturing next chunk
-        wait_for_no_ads(hls_url, "mid-roll")
+        mid_roll = wait_for_no_ads(hls_url, "mid-roll")
+        if mid_roll["detected"]:
+            ad_stats["mid_roll_detected"] = True
+            ad_stats["ad_event_count"] += 1
+        ad_stats["mid_roll_wait_seconds"] += int(mid_roll["wait_seconds"])
+        ad_stats["total_ad_wait_seconds"] += int(mid_roll["wait_seconds"])
 
         current_chunk = min(chunk_seconds, remaining)
         if sample_start_utc is None:
@@ -514,14 +695,19 @@ def capture_audio_with_ad_handling(hls_url, ffmpeg_cmd, sample_seconds, start_se
                 print("No audio received after multiple attempts.")
                 return None
             # If audio is missing, check for ads again and retry
-            wait_for_no_ads(hls_url, "mid-roll")
+            retry_mid_roll = wait_for_no_ads(hls_url, "mid-roll")
+            if retry_mid_roll["detected"]:
+                ad_stats["mid_roll_detected"] = True
+                ad_stats["ad_event_count"] += 1
+            ad_stats["mid_roll_wait_seconds"] += int(retry_mid_roll["wait_seconds"])
+            ad_stats["total_ad_wait_seconds"] += int(retry_mid_roll["wait_seconds"])
             continue
 
         attempts_without_audio = 0
         samples.extend(chunk)
         remaining -= current_chunk
 
-    return samples, sample_start_utc
+    return samples, sample_start_utc, ad_stats
 
 
 def calculate_db(samples):
@@ -663,7 +849,7 @@ def _round_metric(value, digits=2):
     return round(numeric, digits)
 
 
-def build_result_payload(args, is_vod, stream_info, start_seconds, sample_start_time, sample_start_time_utc, samples, avg_db, peak_db, clip_count, clip_pct, clip_rate_per_sec, lufs):
+def build_result_payload(args, is_vod, stream_info, start_seconds, sample_start_time, sample_start_time_utc, samples, avg_db, peak_db, clip_count, clip_pct, clip_rate_per_sec, lufs, ad_stats):
     integrated_loudness = lufs.get("integrated_loudness") if lufs else None
     loudness_range = lufs.get("loudness_range") if lufs else None
     true_peak = lufs.get("true_peak") if lufs else None
@@ -718,6 +904,14 @@ def build_result_payload(args, is_vod, stream_info, start_seconds, sample_start_
                 "count": int(clip_count),
                 "percent": _round_metric(clip_pct, 6),
                 "ratePerSecond": _round_metric(clip_rate_per_sec),
+            },
+            "adHandling": {
+                "preRollDetected": bool(ad_stats.get("pre_roll_detected")),
+                "preRollWaitSeconds": int(ad_stats.get("pre_roll_wait_seconds", 0)),
+                "midRollDetected": bool(ad_stats.get("mid_roll_detected")),
+                "midRollWaitSeconds": int(ad_stats.get("mid_roll_wait_seconds", 0)),
+                "adEventCount": int(ad_stats.get("ad_event_count", 0)),
+                "totalAdWaitSeconds": int(ad_stats.get("total_ad_wait_seconds", 0)),
             },
             "loudness": {
                 "available": bool(lufs),
@@ -832,7 +1026,7 @@ def main():
     )
     if not capture_result:
         sys.exit(1)
-    samples, live_sample_start_utc = capture_result
+    samples, live_sample_start_utc, ad_stats = capture_result
 
     if is_vod:
         sample_start_time = format_hhmmss(start_seconds)
@@ -876,6 +1070,13 @@ def main():
     if sample_start_time:
         print(f"Sample Start Time: {sample_start_time}")
     print(f"Sample Duration: {args.sample_seconds} seconds")
+    print(
+        "Ad Wait: "
+        f"pre-roll={ad_stats['pre_roll_wait_seconds']}s, "
+        f"mid-roll={ad_stats['mid_roll_wait_seconds']}s, "
+        f"total={ad_stats['total_ad_wait_seconds']}s, "
+        f"events={ad_stats['ad_event_count']}"
+    )
     print(f"Total Samples: {len(samples)}")
     print(f"\nRMS Average Level: {avg_db:.2f} dB")
     print(f"RMS Dynamic Range: {peak_db - avg_db:.2f} dB")
@@ -950,6 +1151,7 @@ def main():
             clip_pct,
             clip_rate_per_sec,
             lufs,
+            ad_stats,
         )
     )
 
