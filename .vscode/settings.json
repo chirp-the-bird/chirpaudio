@@ -1,6 +1,7 @@
 {
   "files.associations": {
-    "VERSION": "plaintext"
+    "VERSION": "plaintext",
+    "**/VERSION": "plaintext"
   },
   // Exclude the twitch_tokens.json file from the file explorer pane and search results in case you screen share VSCode.
   "files.exclude": {

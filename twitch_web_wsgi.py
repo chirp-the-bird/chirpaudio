@@ -367,9 +367,23 @@ def render_html():
                 .meter-channel-name{font-size:1.15rem;font-weight:700;color:#eef5ff;display:block;margin-bottom:3px}
                 .meter-source-title{font-size:.9rem;color:var(--muted);display:block}
                 .meter-board{display:grid;grid-template-columns:520px minmax(200px,280px);gap:20px;align-items:start}
+                .meter-left-column{display:flex;flex-direction:column;gap:18px}
                 .meter-stack{display:flex;flex-direction:column;gap:18px}
                 .meter-panel{background:#111824;border:1px solid #2e3d53;border-radius:12px;padding:14px}
                 .meter-title{margin:0;font-size:1.05rem;color:#eef5ff}
+                .stream-loudness-panel{height:68px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;padding:10px 14px}
+                .stream-loudness-panel .meter-title{font-size:1rem}
+                .stream-loudness-body{display:flex;align-items:center;gap:10px}
+                .stream-loudness-icon{font-size:1.35rem;line-height:1;font-weight:700;display:inline-block;min-width:20px;text-align:center}
+                .stream-loudness-text{font-size:.9rem;color:#e6efff}
+                .stream-loudness-panel.status-unknown .stream-loudness-icon{color:#93a5be}
+                .stream-loudness-panel.status-unknown .stream-loudness-text{color:#b8c8dc}
+                .stream-loudness-panel.status-good{border-color:#2a7e4a;background:linear-gradient(180deg,#12271c,#102319)}
+                .stream-loudness-panel.status-good .stream-loudness-icon{color:#67e59c}
+                .stream-loudness-panel.status-warning{border-color:#8c7a2f;background:linear-gradient(180deg,#28220f,#231f0e)}
+                .stream-loudness-panel.status-warning .stream-loudness-icon{color:#ffd660}
+                .stream-loudness-panel.status-bad{border-color:#913737;background:linear-gradient(180deg,#2f1313,#2a1010)}
+                .stream-loudness-panel.status-bad .stream-loudness-icon{color:#ff8e8e}
                 .meter-copy{margin:6px 0 0;color:var(--muted);font-size:.84rem;line-height:1.35}
                 .meter-row{display:grid;grid-template-columns:minmax(0,1fr) 84px;gap:14px;align-items:center;margin-top:14px}
                 .meter-range{display:flex;justify-content:space-between;align-items:center;margin:0 0 8px;color:#d5e2f1;font-size:.92rem}
@@ -493,6 +507,11 @@ def render_html():
                                                                 <div id="meterWrap" class="meter-wrap">
                                                                         <p id="meterStatus" class="meter-status">Waiting for run...</p>
                                                                                                                                                 <div id="meterBoard" class="meter-board">
+                                                                            <div class="meter-left-column">
+                                                                                <div id="streamLoudnessPanel" class="meter-panel stream-loudness-panel status-unknown">
+                                                                                    <h4 class="meter-title">Stream Loudness</h4>
+                                                                                    <div class="stream-loudness-body"><span id="streamLoudnessIcon" class="stream-loudness-icon" aria-hidden="true">•</span><span id="streamLoudnessText" class="stream-loudness-text">Run a test to evaluate stream loudness.</span></div>
+                                                                                </div>
                                                                             <div class="meter-stack">
                                                                                 <section class="meter-panel">
                                                                                     <h4 class="meter-title">RMS Loudness</h4>
@@ -528,7 +547,7 @@ def render_html():
                                                                                                 <div id="lufsTpkMarker" class="value-marker value-marker-v alt"><span id="lufsTpkLabel" class="value-label">-- TPK</span></div>
                                                                                             </div>
                                                                                             <div class="scale-labels horizontal-11">
-                                                                                                <span>-40</span><span>-35</span><span>-30</span><span>-25</span><span>-20</span><span>-15</span><span>-10</span><span>-5</span><span>0</span><span>5</span><span>10</span>
+                                                                                                <span>-40</span><span>-35</span><span>-30</span><span>-25</span><span>-20</span><span>-15</span><span>-10</span><span>-5</span><span>0</span><span>+5</span><span>+10</span>
                                                                                             </div>
                                                                                         </div>
                                                                                         <aside class="clip-box">
@@ -537,6 +556,7 @@ def render_html():
                                                                                         </aside>
                                                                                     </div>
                                                                                 </section>
+                                                                            </div>
                                                                             </div>
 
                                                                             <section class="meter-panel lra-panel">
@@ -575,6 +595,11 @@ def render_html():
 <script>
 let currentSource = null;
 let lastResultPayload = null;
+const RMS_GOOD_RANGE_MIN_DB = -40;
+const RMS_GOOD_RANGE_MAX_DB = -10;
+const LUFS_GOOD_RANGE_MIN = -35;
+const LUFS_GOOD_RANGE_MAX = -14;
+const RANGE_EDGE_WARNING_DB = 0.5;
 function escHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 
 function setRunButtonsDisabled(disabled){
@@ -608,6 +633,39 @@ function clampToRange(value, minValue, maxValue){
 function formatValue(value, unit){
     if (!Number.isFinite(value)) return '-- ' + unit;
     return value.toFixed(2) + ' ' + unit;
+}
+
+function inRange(value, minValue, maxValue){
+    return Number.isFinite(value) && value >= minValue && value <= maxValue;
+}
+
+function inInnerRange(value, minValue, maxValue, edgeBuffer){
+    return Number.isFinite(value) && value >= (minValue + edgeBuffer) && value <= (maxValue - edgeBuffer);
+}
+
+function setStreamLoudnessState(state, message){
+    const panel = document.getElementById('streamLoudnessPanel');
+    const icon = document.getElementById('streamLoudnessIcon');
+    const text = document.getElementById('streamLoudnessText');
+    if (!panel || !icon || !text) return;
+
+    panel.classList.remove('status-good', 'status-warning', 'status-bad', 'status-unknown');
+
+    if (state === 'good'){
+        panel.classList.add('status-good');
+        icon.textContent = '✓';
+    } else if (state === 'warning'){
+        panel.classList.add('status-warning');
+        icon.textContent = '▲';
+    } else if (state === 'bad'){
+        panel.classList.add('status-bad');
+        icon.textContent = '✕';
+    } else {
+        panel.classList.add('status-unknown');
+        icon.textContent = '•';
+    }
+
+    text.textContent = message;
 }
 
 function setClipLed(id, isActive){
@@ -703,6 +761,7 @@ function resetMeters(){
     hideMarker('lraMarker');
     setClipLed('rmsClipLed', false);
     setClipLed('lufsClipLed', false);
+    setStreamLoudnessState('unknown', 'Run a test to evaluate stream loudness.');
 }
 
 function renderMeters(payload){
@@ -727,8 +786,45 @@ function renderMeters(payload){
     applyPeakMarkerWarning('lufsTpkMarker', truePeak);
 
     const rmsPeakAtOrOverClip = Number.isFinite(rmsPeak) && rmsPeak >= -0.005;
-    setClipLed('rmsClipLed', !!sampleClip.detected || rmsPeakAtOrOverClip);
-    setClipLed('lufsClipLed', !!loud.truePeakClippingDetected);
+    const rmsClipDetected = !!sampleClip.detected || rmsPeakAtOrOverClip;
+    const truePeakClipDetected = !!loud.truePeakClippingDetected;
+    setClipLed('rmsClipLed', rmsClipDetected);
+    setClipLed('lufsClipLed', truePeakClipDetected);
+
+    if (rmsClipDetected || truePeakClipDetected){
+        setStreamLoudnessState('bad', 'Audio sample is too loud and clipping.');
+        return;
+    }
+
+    const hasRmsAvg = Number.isFinite(rmsAvg);
+    const hasIntegratedLufs = Number.isFinite(integratedLufs);
+    if (!hasRmsAvg || !hasIntegratedLufs){
+        setStreamLoudnessState('unknown', 'Unable to analyze audio sample.');
+        return;
+    }
+
+    const rmsWithinGood = inRange(rmsAvg, RMS_GOOD_RANGE_MIN_DB, RMS_GOOD_RANGE_MAX_DB);
+    const lufsWithinGood = inRange(integratedLufs, LUFS_GOOD_RANGE_MIN, LUFS_GOOD_RANGE_MAX);
+    const rmsInnerGood = inInnerRange(rmsAvg, RMS_GOOD_RANGE_MIN_DB, RMS_GOOD_RANGE_MAX_DB, RANGE_EDGE_WARNING_DB);
+    const lufsInnerGood = inInnerRange(integratedLufs, LUFS_GOOD_RANGE_MIN, LUFS_GOOD_RANGE_MAX, RANGE_EDGE_WARNING_DB);
+
+    if (rmsInnerGood && lufsInnerGood){
+        setStreamLoudnessState('good', 'Audio sample within range.');
+        return;
+    }
+
+    if (!rmsWithinGood || !lufsWithinGood){
+        const veryQuiet = (Number.isFinite(rmsAvg) && rmsAvg < RMS_GOOD_RANGE_MIN_DB) ||
+            (Number.isFinite(integratedLufs) && integratedLufs < LUFS_GOOD_RANGE_MIN);
+        if (veryQuiet){
+            setStreamLoudnessState('warning', 'Audio sample is very quiet.');
+        } else {
+            setStreamLoudnessState('warning', 'Audio sample is loud and nearing limit.');
+        }
+        return;
+    }
+
+    setStreamLoudnessState('unknown', 'Unable to analyze audio sample.');
 }
 
 async function runForm(form){
@@ -752,6 +848,7 @@ async function runForm(form){
     meterStatus.innerHTML = '<span class="processing-indicator"><span class="processing-spinner" aria-hidden="true"></span>Processing...</span>';
     lastResultPayload = null;
     resetMeters();
+    setStreamLoudnessState('unknown', 'Analyzing stream loudness...');
     setRunButtonsDisabled(true);
     const qs = new URLSearchParams(new FormData(form));
     qs.append('stream', '1');

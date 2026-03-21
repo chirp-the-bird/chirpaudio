@@ -634,7 +634,7 @@ def wait_for_no_ads(hls_url: str, context: str) -> dict:
     while waited < AD_MAX_WAIT_SECONDS:
         if not hls_playlist_has_ad(hls_url):
             stats["wait_seconds"] = waited
-            print("Ad finished. Resuming analysis.")
+            print(f"Ad finished after {waited} seconds. Resuming analysis...")
             return stats
         time.sleep(AD_POLL_INTERVAL_SECONDS)
         waited += AD_POLL_INTERVAL_SECONDS
@@ -1066,7 +1066,6 @@ def main():
         print(f"Start Offset: {format_hhmmss(start_seconds)} ({start_seconds} seconds)")
     else:
         print(f"Channel: {args.channel}")
-    print(f"Stream Title: {stream_info['title']}")
     if sample_start_time:
         print(f"Sample Start Time: {sample_start_time}")
     print(f"Sample Duration: {args.sample_seconds} seconds")
