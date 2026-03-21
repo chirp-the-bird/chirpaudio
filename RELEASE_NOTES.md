@@ -30,6 +30,18 @@ Added:
 
 ---
 
+## [1.0.6] - 2026-03-21
+
+Added:
+- Added a Stream Loudness summary indicator with good, warning, bad, and unknown states in the web results view.
+
+Changed:
+- Simplified analyzer/log output by removing the duplicate stream title line.
+- Adjusted the LUFS display scale labeling and results layout.
+- VERSION updated to 1.0.6.
+
+---
+
 ## [1.0.5] - 2026-03-17
 
 Added:
