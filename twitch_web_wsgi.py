@@ -373,6 +373,9 @@ def render_html():
                 .meter-copy{margin:6px 0 0;color:var(--muted);font-size:.84rem;line-height:1.35}
                 .meter-row{display:grid;grid-template-columns:minmax(0,1fr) 84px;gap:14px;align-items:center;margin-top:14px}
                 .meter-range{display:flex;justify-content:space-between;align-items:center;margin:0 0 8px;color:#d5e2f1;font-size:.92rem}
+                .meter-range-lufs{display:block;position:relative;height:1.1em}
+                .meter-range-lufs span:first-child{position:absolute;left:0;top:0}
+                .meter-range-lufs .meter-range-zero{position:absolute;left:80%;top:0;transform:translateX(-50%);white-space:nowrap}
                 .meter-shell{background:#0f1822;border:1px solid #3a5069;border-radius:14px;padding:10px;position:relative;overflow:visible}
                 .meter-fill{position:relative;border-radius:10px;overflow:hidden}
                 .meter-fill.horizontal{height:54px}
@@ -518,7 +521,7 @@ def render_html():
                                                                                     <p class="meter-copy">Audio sample Integrated loudness (LUFS) and True Peak (dBTPK).</p>
                                                                                     <div class="meter-row">
                                                                                         <div>
-                                                                                            <div class="meter-range"><span>-40 LUFS</span><span>10 LUFS</span></div>
+                                                                                            <div class="meter-range meter-range-lufs"><span>-40 LUFS</span><span class="meter-range-zero">0 LUFS</span></div>
                                                                                             <div id="lufsShell" class="meter-shell">
                                                                                                 <div class="meter-fill horizontal lufs-gradient horizontal-ticks"></div>
                                                                                                 <div id="lufsIntMarker" class="value-marker value-marker-v label-bottom"><span id="lufsIntLabel" class="value-label">-- LUFS</span></div>
